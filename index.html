@@ -3,112 +3,96 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Map avec Orientation</title>
+    <title>Carte orientée avec OpenStreetMap</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <style>
-        html, body {
-            height: 100%;
+        body {
             margin: 0;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
+            height: 100vh;
+            background: #1e1e1e;
+            color: white;
+            font-family: Arial, sans-serif;
         }
-        #map {
-            height: 90vh;
-            width: 100%;
-        }
-        #startButton {
-            padding: 10px 20px;
+
+        #start {
+            padding: 10px 15px;
             font-size: 16px;
             margin-bottom: 10px;
             cursor: pointer;
             border: none;
-            background-color: #007bff;
+            background: #ff5722;
             color: white;
             border-radius: 5px;
+        }
+
+        #map {
+            width: 90%;
+            height: 80vh;
+            border-radius: 10px;
+            overflow: hidden;
         }
     </style>
 </head>
 <body>
-
-    <button id="startButton">Activer l'orientation</button>
+    <button id="start">Activer l'orientation</button>
     <div id="map"></div>
-
+    
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script>
-        let map = L.map('map').setView([48.8566, 2.3522], 17); // Coordonnées par défaut (Paris)
-        let marker, heading = 0;
+        // Initialise la carte
+        let map = L.map('map').setView([48.8566, 2.3522], 15); // Centre sur Paris
 
-        // Charger la carte
+        // Ajout d'un fond de carte OpenStreetMap
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap contributors'
+            maxZoom: 19,
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         }).addTo(map);
 
-        // Icône personnalisée orientable
-        let icon = L.icon({
-            iconUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d2/Purple_arrow_right.svg/500px-Purple_arrow_right.svg.png',
-            iconSize: [30, 30],
-            iconAnchor: [15, 15]
-        });
+        // Ajout d'un marqueur pour afficher la position
+        let marker = L.marker([48.8566, 2.3522]).addTo(map);
 
-        function updateMarkerRotation() {
-            if (marker) {
-                marker._icon.style.transform = `rotate(${heading}deg)`;
-            }
-        }
+        // Demande la position GPS
+        navigator.geolocation.watchPosition(position => {
+            let lat = position.coords.latitude;
+            let lon = position.coords.longitude;
 
-        function handleOrientation(event) {
-            if (event.alpha !== null) {
-                heading = event.alpha;
-                updateMarkerRotation();
-            }
-        }
+            // Mise à jour de la carte et du marqueur
+            map.setView([lat, lon], 17);
+            marker.setLatLng([lat, lon]);
+        }, error => {
+            console.error("Erreur de géolocalisation :", error);
+        }, { enableHighAccuracy: true });
 
-        function initLocation() {
-            if (!navigator.geolocation) {
-                alert("La géolocalisation n'est pas supportée par ton navigateur.");
-                return;
-            }
-
-            navigator.geolocation.watchPosition(position => {
-                let { latitude, longitude } = position.coords;
-
-                if (!marker) {
-                    marker = L.marker([latitude, longitude], { icon }).addTo(map);
-                } else {
-                    marker.setLatLng([latitude, longitude]);
-                }
-
-                map.setView([latitude, longitude]);
-            }, err => {
-                alert("Erreur de localisation : " + err.message);
-            }, { enableHighAccuracy: true });
-        }
-
-        function requestPermissions() {
-            if (typeof DeviceOrientationEvent.requestPermission === "function") {
+        // Fonction pour activer l'orientation
+        function enableOrientation() {
+            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
                 DeviceOrientationEvent.requestPermission()
                     .then(permissionState => {
-                        if (permissionState === "granted") {
-                            window.addEventListener("deviceorientation", handleOrientation);
-                        } else {
-                            alert("Autorisation refusée.");
+                        if (permissionState === 'granted') {
+                            window.addEventListener("deviceorientation", updateOrientation, true);
                         }
                     })
-                    .catch(() => alert("Impossible de demander l'autorisation. Essaye depuis Safari."));
+                    .catch(console.error);
             } else {
-                window.addEventListener("deviceorientation", handleOrientation);
+                window.addEventListener("deviceorientation", updateOrientation, true);
             }
         }
 
-        document.getElementById("startButton").addEventListener("click", () => {
-            requestPermissions();
-            document.getElementById("startButton").style.display = "none"; // Cache le bouton après activation
-        });
+        // Fonction pour faire tourner la carte
+        function updateOrientation(event) {
+            if (event.alpha !== null) {
+                let angle = 360 - event.alpha;
+                map.setRotation(angle); // Tourne la carte selon l'angle
+                marker.setRotationAngle(angle);
+            }
+        }
 
-        initLocation();
+        // Activation via bouton
+        document.getElementById("start").addEventListener("click", enableOrientation);
     </script>
-
 </body>
 </html>
