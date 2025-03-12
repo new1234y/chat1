@@ -3,14 +3,78 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Carte orientée</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/leaflet-rotatedmarker/leaflet.rotatedMarker.js"></script>
+    <title>Map orientée</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        #map {
+            height: 90vh;
+            width: 100%;
+        }
+        #start {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin-bottom: 10px;
+            cursor: pointer;
+        }
+    </style>
 </head>
 <body>
-    <button id="start">Activer l'orientation</button>
+    <button id="start">Autoriser l'orientation</button>
     <div id="map"></div>
-    <script src="script.js"></script>
+
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+        let map = L.map('map').setView([48.8566, 2.3522], 13); // Coordonnées de Paris
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        let heading = 0;
+
+        function updateMapRotation() {
+            map.eachLayer(layer => {
+                if (layer instanceof L.TileLayer) {
+                    layer._container.style.transform = `rotate(${-heading}deg)`;
+                }
+            });
+        }
+
+        function handleOrientation(event) {
+            if (event.alpha !== null) {
+                heading = event.alpha;
+                updateMapRotation();
+            }
+        }
+
+        function requestPermission() {
+            if (typeof DeviceOrientationEvent.requestPermission === "function") {
+                DeviceOrientationEvent.requestPermission()
+                    .then(permissionState => {
+                        if (permissionState === "granted") {
+                            window.addEventListener("deviceorientation", handleOrientation);
+                            document.getElementById("start").style.display = "none";
+                        } else {
+                            alert("Autorisation refusée. Active-la dans les réglages.");
+                        }
+                    })
+                    .catch(() => alert("Impossible de demander l'autorisation. Essaye depuis Safari."));
+            } else {
+                window.addEventListener("deviceorientation", handleOrientation);
+                document.getElementById("start").style.display = "none";
+            }
+        }
+
+        document.getElementById("start").addEventListener("click", requestPermission);
+    </script>
 </body>
 </html>
