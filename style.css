@@ -1,0 +1,29 @@
+body {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    background: #1e1e1e;
+    color: white;
+    font-family: Arial, sans-serif;
+}
+
+#start {
+    padding: 10px 15px;
+    font-size: 16px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    border: none;
+    background: #ff5722;
+    color: white;
+    border-radius: 5px;
+}
+
+#map {
+    width: 90%;
+    height: 80vh;
+    border-radius: 10px;
+    overflow: hidden;
+}
