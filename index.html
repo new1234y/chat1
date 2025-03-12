@@ -11,7 +11,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
+            justify-content: flex-start; /* Aligne le contenu en haut */
             height: 100vh;
             background: #1e1e1e;
             color: white;
@@ -21,19 +21,21 @@
         #start {
             padding: 10px 15px;
             font-size: 16px;
-            margin-bottom: 10px;
+            margin: 15px; /* Ajoute un peu d'espace autour du bouton */
             cursor: pointer;
             border: none;
             background: #ff5722;
             color: white;
             border-radius: 5px;
+            z-index: 1000; /* Assure que le bouton soit au-dessus de la carte */
         }
 
         #map {
-            width: 90%;
-            height: 80vh;
+            width: 100%; /* Fait en sorte que la carte prenne toute la largeur */
+            height: calc(100vh - 70px); /* Prend tout l'espace restant sous le bouton */
             border-radius: 10px;
             overflow: hidden;
+            transition: transform 0.5s; /* Transition pour une rotation fluide */
         }
     </style>
 </head>
@@ -52,10 +54,10 @@
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         }).addTo(map);
 
-        // Ajout d'un marqueur pour afficher la position
+        // Marqueur initial
         let marker = L.marker([48.8566, 2.3522]).addTo(map);
 
-        // Demande la position GPS
+        // Demande de géolocalisation
         navigator.geolocation.watchPosition(position => {
             let lat = position.coords.latitude;
             let lon = position.coords.longitude;
@@ -73,25 +75,33 @@
                 DeviceOrientationEvent.requestPermission()
                     .then(permissionState => {
                         if (permissionState === 'granted') {
-                            window.addEventListener("deviceorientation", updateOrientation, true);
+                            startOrientationTracking();
+                        } else {
+                            alert("Autorisation refusée pour l'orientation de l'appareil.");
                         }
                     })
-                    .catch(console.error);
+                    .catch(error => {
+                        console.error("Erreur lors de la demande d'autorisation :", error);
+                    });
             } else {
-                window.addEventListener("deviceorientation", updateOrientation, true);
+                startOrientationTracking(); // Pas besoin de demande d'autorisation
             }
         }
 
-        // Fonction pour faire tourner la carte
+        // Fonction pour démarrer le suivi de l'orientation
+        function startOrientationTracking() {
+            window.addEventListener("deviceorientation", updateOrientation, true);
+        }
+
+        // Fonction pour faire tourner la carte avec CSS
         function updateOrientation(event) {
             if (event.alpha !== null) {
-                let angle = 360 - event.alpha;
-                map.setRotation(angle); // Tourne la carte selon l'angle
-                marker.setRotationAngle(angle);
+                let angle = 360 - event.alpha; // Inverser l'angle pour correspondre à l'orientation de la carte
+                document.getElementById("map").style.transform = `rotate(${angle}deg)`; // Appliquer la rotation
             }
         }
 
-        // Activation via bouton
+        // Activation via le bouton
         document.getElementById("start").addEventListener("click", enableOrientation);
     </script>
 </body>
