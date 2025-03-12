@@ -1,108 +1,106 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Carte orientée avec OpenStreetMap</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <title>Afficher un point avec un cercle fixe</title>
+    <meta charset='utf-8'>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel='stylesheet' href='https://unpkg.com/maplibre-gl@5.2.0/dist/maplibre-gl.css' />
+    <script src='https://unpkg.com/maplibre-gl@5.2.0/dist/maplibre-gl.js'></script>
     <style>
-        body {
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: flex-start; /* Aligne le contenu en haut */
-            height: 100vh;
-            background: #1e1e1e;
-            color: white;
-            font-family: Arial, sans-serif;
-        }
-
-        #start {
-            padding: 10px 15px;
-            font-size: 16px;
-            margin: 15px; /* Ajoute un peu d'espace autour du bouton */
-            cursor: pointer;
-            border: none;
-            background: #ff5722;
-            color: white;
-            border-radius: 5px;
-            z-index: 1000; /* Assure que le bouton soit au-dessus de la carte */
-        }
-
-        #map {
-            width: 100%; /* Fait en sorte que la carte prenne toute la largeur */
-            height: calc(100vh - 70px); /* Prend tout l'espace restant sous le bouton */
-            border-radius: 10px;
-            overflow: hidden;
-            transition: transform 0.5s; /* Transition pour une rotation fluide */
-        }
+        body { margin: 0; padding: 0; }
+        html, body, #map { height: 100%; }
     </style>
 </head>
 <body>
-    <button id="start">Activer l'orientation</button>
-    <div id="map"></div>
-    
-    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-    <script>
-        // Initialise la carte
-        let map = L.map('map').setView([48.8566, 2.3522], 15); // Centre sur Paris
+<div id="map"></div>
+<script>
+    const map = new maplibregl.Map({
+        container: 'map',
+        style: 'https://api.maptiler.com/maps/streets/style.json?key=get_your_own_OpIi9ZULNHzrESv6T2vL',
+        center: [2.3522, 48.8566], // Coordonnées pour Paris
+        zoom: 12
+    });
 
-        // Ajout d'un fond de carte OpenStreetMap
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        }).addTo(map);
+    const pointCoordinates = [2.3522, 48.8566]; // Remplace par tes coordonnées
 
-        // Marqueur initial
-        let marker = L.marker([48.8566, 2.3522]).addTo(map);
-
-        // Demande de géolocalisation
-        navigator.geolocation.watchPosition(position => {
-            let lat = position.coords.latitude;
-            let lon = position.coords.longitude;
-
-            // Mise à jour de la carte et du marqueur
-            map.setView([lat, lon], 17);
-            marker.setLatLng([lat, lon]);
-        }, error => {
-            console.error("Erreur de géolocalisation :", error);
-        }, { enableHighAccuracy: true });
-
-        // Fonction pour activer l'orientation
-        function enableOrientation() {
-            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
-                DeviceOrientationEvent.requestPermission()
-                    .then(permissionState => {
-                        if (permissionState === 'granted') {
-                            startOrientationTracking();
-                        } else {
-                            alert("Autorisation refusée pour l'orientation de l'appareil.");
-                        }
-                    })
-                    .catch(error => {
-                        console.error("Erreur lors de la demande d'autorisation :", error);
-                    });
-            } else {
-                startOrientationTracking(); // Pas besoin de demande d'autorisation
+    // Fonction pour créer un cercle de 250m autour du point
+    function createCircle(center, radius) {
+        const points = 64; // Nombre de segments pour le cercle
+        const coords = [];
+        for (let i = 0; i < points; i++) {
+            const angle = (i / points) * 2 * Math.PI;
+            const dx = radius * Math.cos(angle) / 111320; // Convertir mètres à degrés
+            const dy = radius * Math.sin(angle) / 110574; // Convertir mètres à degrés
+            coords.push([center[0] + dx, center[1] + dy]);
+        }
+        coords.push(coords[0]); // Fermer le cercle
+        return {
+            type: 'Feature',
+            geometry: {
+                type: 'Polygon',
+                coordinates: [coords]
             }
-        }
+        };
+    }
 
-        // Fonction pour démarrer le suivi de l'orientation
-        function startOrientationTracking() {
-            window.addEventListener("deviceorientation", updateOrientation, true);
-        }
-
-        // Fonction pour faire tourner la carte avec CSS
-        function updateOrientation(event) {
-            if (event.alpha !== null) {
-                let angle = 360 - event.alpha; // Inverser l'angle pour correspondre à l'orientation de la carte
-                document.getElementById("map").style.transform = `rotate(${angle}deg)`; // Appliquer la rotation
+    // Ajout d'une source pour le point et le cercle
+    map.on('load', () => {
+        // Ajout du point
+        map.addSource('point', {
+            'type': 'geojson',
+            'data': {
+                'type': 'Feature',
+                'geometry': {
+                    'type': 'Point',
+                    'coordinates': pointCoordinates
+                }
             }
-        }
+        });
 
-        // Activation via le bouton
-        document.getElementById("start").addEventListener("click", enableOrientation);
-    </script>
+        // Ajout du cercle de 250m
+        map.addSource('circle', {
+            'type': 'geojson',
+            'data': createCircle(pointCoordinates, 250) // 250 mètres
+        });
+
+        // Layer pour le point
+        map.addLayer({
+            'id': 'point',
+            'type': 'circle',
+            'source': 'point',
+            'paint': {
+                'circle-radius': 10,
+                'circle-color': '#007296'
+            }
+        });
+
+        // Layer pour le cercle
+        map.addLayer({
+            'id': 'circle',
+            'type': 'fill',
+            'source': 'circle',
+            'paint': {
+                'fill-color': '#007296',
+                'fill-opacity': 0.3
+            }
+        });
+    });
+
+    // Fonction pour ajuster l'angle de vue en fonction de l'orientation
+    function adjustView(event) {
+        const alpha = event.alpha; // Orientation autour de l'axe Z
+        const beta = event.beta;   // Inclinaison avant-arrière
+
+        // Convertir les angles en degrés pour la carte
+        const pitch = beta; // Inclinaison avant-arrière
+        const bearing = alpha; // Orientation
+
+        map.setPitch(pitch);
+        map.setBearing(bearing);
+    }
+
+    // Écoute l'événement d'orientation
+    window.addEventListener('deviceorientation', adjustView);
+</script>
 </body>
 </html>
