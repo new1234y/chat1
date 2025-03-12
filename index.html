@@ -1,106 +1,119 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <title>Afficher un point avec un cercle fixe</title>
+    <title>Carte avec Gyroscope</title>
     <meta charset='utf-8'>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
     <link rel='stylesheet' href='https://unpkg.com/maplibre-gl@5.2.0/dist/maplibre-gl.css' />
     <script src='https://unpkg.com/maplibre-gl@5.2.0/dist/maplibre-gl.js'></script>
     <style>
         body { margin: 0; padding: 0; }
         html, body, #map { height: 100%; }
+        #button-container {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1;
+        }
     </style>
 </head>
 <body>
-<div id="map"></div>
-<script>
-    const map = new maplibregl.Map({
-        container: 'map',
-        style: 'https://api.maptiler.com/maps/streets/style.json?key=get_your_own_OpIi9ZULNHzrESv6T2vL',
-        center: [2.3522, 48.8566], // Coordonnées pour Paris
-        zoom: 12
-    });
+    <div id="map"></div>
+    <div id="button-container">
+        <button id="enable-gyroscope">Activer Gyroscope</button>
+    </div>
+    <script>
+        const map = new maplibregl.Map({
+            container: 'map',
+            style: 'https://api.maptiler.com/maps/streets/style.json?key=get_your_own_OpIi9ZULNHzrESv6T2vL',
+            center: [2.3522, 48.8566], 
+            zoom: 12
+        });
 
-    const pointCoordinates = [2.3522, 48.8566]; // Remplace par tes coordonnées
+        const pointCoordinates = [2.3522, 48.8566];
 
-    // Fonction pour créer un cercle de 250m autour du point
-    function createCircle(center, radius) {
-        const points = 64; // Nombre de segments pour le cercle
-        const coords = [];
-        for (let i = 0; i < points; i++) {
-            const angle = (i / points) * 2 * Math.PI;
-            const dx = radius * Math.cos(angle) / 111320; // Convertir mètres à degrés
-            const dy = radius * Math.sin(angle) / 110574; // Convertir mètres à degrés
-            coords.push([center[0] + dx, center[1] + dy]);
-        }
-        coords.push(coords[0]); // Fermer le cercle
-        return {
-            type: 'Feature',
-            geometry: {
-                type: 'Polygon',
-                coordinates: [coords]
+        function createCircle(center, radius) {
+            const points = 64;
+            const coords = [];
+            for (let i = 0; i < points; i++) {
+                const angle = (i / points) * 2 * Math.PI;
+                const dx = radius * Math.cos(angle) / 111320;
+                const dy = (radius * Math.sin(angle) / 111320) / Math.cos(center[1] * (Math.PI / 180));
+                coords.push([center[0] + dx, center[1] + dy]);
             }
-        };
-    }
-
-    // Ajout d'une source pour le point et le cercle
-    map.on('load', () => {
-        // Ajout du point
-        map.addSource('point', {
-            'type': 'geojson',
-            'data': {
-                'type': 'Feature',
-                'geometry': {
-                    'type': 'Point',
-                    'coordinates': pointCoordinates
+            coords.push(coords[0]);
+            return {
+                type: 'Feature',
+                geometry: {
+                    type: 'Polygon',
+                    coordinates: [coords]
                 }
+            };
+        }
+
+        map.on('load', () => {
+            map.addSource('point', {
+                type: 'geojson',
+                data: {
+                    type: 'Feature',
+                    geometry: { type: 'Point', coordinates: pointCoordinates }
+                }
+            });
+
+            map.addSource('circle', {
+                type: 'geojson',
+                data: createCircle(pointCoordinates, 250)
+            });
+
+            map.addLayer({
+                id: 'point',
+                type: 'circle',
+                source: 'point',
+                paint: {
+                    'circle-radius': 10,
+                    'circle-color': '#007296'
+                }
+            });
+
+            map.addLayer({
+                id: 'circle',
+                type: 'fill',
+                source: 'circle',
+                paint: {
+                    'fill-color': '#007296',
+                    'fill-opacity': 0.3
+                }
+            });
+        });
+
+        function enableGyroscope() {
+            if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+                // Demande de permission sur iOS
+                DeviceOrientationEvent.requestPermission()
+                    .then(permissionState => {
+                        if (permissionState === 'granted') {
+                            window.addEventListener('deviceorientation', adjustView);
+                        } else {
+                            alert('Accès au gyroscope refusé.');
+                        }
+                    })
+                    .catch(console.error);
+            } else if (window.DeviceOrientationEvent) {
+                // Android / navigateurs normaux
+                window.addEventListener('deviceorientation', adjustView);
+            } else {
+                alert('Ce navigateur ne supporte pas le gyroscope.');
             }
-        });
+        }
 
-        // Ajout du cercle de 250m
-        map.addSource('circle', {
-            'type': 'geojson',
-            'data': createCircle(pointCoordinates, 250) // 250 mètres
-        });
-
-        // Layer pour le point
-        map.addLayer({
-            'id': 'point',
-            'type': 'circle',
-            'source': 'point',
-            'paint': {
-                'circle-radius': 10,
-                'circle-color': '#007296'
+        function adjustView(event) {
+            if (event.alpha !== null) {
+                const bearing = event.alpha;
+                map.setBearing(bearing);
             }
-        });
+        }
 
-        // Layer pour le cercle
-        map.addLayer({
-            'id': 'circle',
-            'type': 'fill',
-            'source': 'circle',
-            'paint': {
-                'fill-color': '#007296',
-                'fill-opacity': 0.3
-            }
-        });
-    });
-
-    // Fonction pour ajuster l'angle de vue en fonction de l'orientation
-    function adjustView(event) {
-        const alpha = event.alpha; // Orientation autour de l'axe Z
-        const beta = event.beta;   // Inclinaison avant-arrière
-
-        // Convertir les angles en degrés pour la carte
-        const pitch = beta; // Inclinaison avant-arrière
-        const bearing = alpha; // Orientation
-
-        map.setPitch(pitch);
-        map.setBearing(bearing);
-    }
-
-    // Écoute l'événement d'orientation
-    window.addEventListener('deviceorientation', adjustView);
-</script>
+        document.getElementById('enable-gyroscope').addEventListener('click', enableGyroscope);
+    </script>
 </body>
 </html>
